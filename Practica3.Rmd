@@ -1,0 +1,241 @@
+```{r echo=FALSE,message=FALSE}
+
+
+library(ggplot2)
+library(dplyr)
+library(readr)
+```
+---
+title: "<center>DATA SCIENCE APLICADO A LA CIBERSEGURIDAD - Práctica 3</center>"
+output: html_document
+
+---
+
+# PREGUNTA 1
+
+Descomprimir el fichero comprimido que contiene los registros del servidor, y a partir de los datos extraídos, cargar en data frame los registros con las peticiones servidas.
+
+
+
+```{r, message = FALSE, warning = FALSE}
+
+#Subimos el Documento
+epa_http <- read_table("epa-http.csv", col_names = FALSE)
+
+#Nombramos las columnas
+nombres_columnas <- c("Origen", "Tiempo",  "Tipo" , "URL" , "Protocolo", "Código", "Bytes")
+colnames(epa_http) <- nombres_columnas
+
+#Realizamos la limpieza de los datos
+epa_http$Tiempo <- gsub("\\[|\\]", "", epa_http$Tiempo)
+epa_http$Tipo <- gsub("\"", "", epa_http$Tipo)
+epa_http$Protocolo <- gsub("\"", "", epa_http$Protocolo)
+epa_http$Bytes <- ifelse(is.na(as.numeric(epa_http$Bytes)), NA, as.numeric(epa_http$Bytes))
+
+
+
+```
+
+**Respuesta: Se realizó la limpieza de la data del fichero comprimido. Por motivo de performance no se muestra la tabla en el documento debido a la cantidad de filas que tiene, para mayor detalle de la tabla, revisar el documento "Práctica 3.R" **
+
+
+# PREGUNTA 2
+
+Identificar el número único de usuarios que han interactuado directamente con el servidor de forma segregada según si los usuarios han tenido algún tipo de error en las distintas peticiones ofrecidas por el servidor.
+
+```{r echo=FALSE}
+
+# Crear tabla con columnas "Origen", "Código" y "Status"
+nueva_tabla <- data.frame(Origen = epa_http$Origen, Código = epa_http$Código, Status = ifelse(epa_http$Código == 200, "Conectado", "Sin Conexión"))
+nueva_tabla_sin_repetidos <- unique(nueva_tabla)
+
+nueva_tabla_agrupada <- aggregate(Código ~ Origen + Status, data = nueva_tabla_sin_repetidos, FUN = function(x) ifelse(all(x == 200), 200, paste(unique(x), collapse = ",")))
+
+nueva_tabla_agrupada <- nueva_tabla_agrupada[order(nueva_tabla_agrupada$Origen, nueva_tabla_agrupada$Código, nueva_tabla_agrupada$Status), ]
+
+# Contar las filas por valor de "Status"
+conectados <- sum(nueva_tabla_agrupada$Status == "Conectado")
+sin_conexion <- sum(nueva_tabla_agrupada$Status == "Sin Conexión")
+
+```
+
+**Respuesta: Se interpreta de la siguiente manera:** 
+**Si un usuario tiene el Código 200 significa que se han conectado al Servidor**
+**Si un usuario tiene el Código diferente a 200 significa que no se han podido conectar al Servidor por algún error**
+**Un usuario único puede haber tenido Conexión y haber estado Sin Conexión al servidor en tiempos diferente**
+
+**Teniendo en cuenta lo antes mencionado, la respuesta es la siguiente**
+
+
+```{r echo=FALSE}
+
+# Mostrar los resultados
+cat("Cantidad de usuarios únicos que se conectaron al servidor existosamente:", conectados, "\n")
+cat("Cantidad de usuarios únicos que no se conectaron al servidor por algún tipo de error:", sin_conexion, "\n")
+```
+
+# PREGUNTA 3
+
+Analizar los distintos tipos de peticiones HTTP (GET, POST, PUT, DELETE) gestionadas por el servidor, identificando la frecuencia de cada una de estas.
+Repetir el análisis, esta vez filtrando previamente aquellas peticiones correspondientes a recursos ofrecidos de tipo imagen.
+
+```{r echo=FALSE}
+
+# Crear tabla con columnas "Origen", "Código" y "Status"
+tipo_URL <- subset(epa_http, select = c("Tipo", "URL"))
+
+#Filtramos por tipo de imágenes
+tipo_URLimagenes <- subset(tipo_URL, grepl("\\.(png|jpg|gif|ico|JPG|Gif)$", URL))
+
+#Hallamos la frecuencia por tipo de Peticiones
+frecuencia_tipo <- table(tipo_URLimagenes$Tipo)
+
+
+
+```
+
+**Respuesta: La frecuencia de los tipos de peticiones para recursos de tipo imagen son:** 
+
+
+```{r echo=FALSE}
+
+# Mostrar los resultados
+print(frecuencia_tipo)
+```
+
+# PREGUNTA 4
+
+Generar un gráfico que permita visualizar las respuestas del servidor, es decir, la distribución de peticiones según el código de respuesta de esta. Probad distintos tipos de gráficos (por lo menos 2 distintos e incluid estos en el documento RMarkdown).
+
+```{r echo=FALSE}
+
+# contar las ocurrencias de cada código de respuesta y guardar el resultado en un data frame
+resumen_respuestas <- as.data.frame(table(epa_http$Código))
+
+# renombrar las columnas del data frame
+colnames(resumen_respuestas) <- c("Codigo", "Frecuencia")
+
+
+```
+
+**Respuesta: Primer Gráfico - Barras:** 
+
+
+```{r echo=FALSE}
+
+# crear el gráfico de barras y agregar los valores encima de la gráfica
+ggplot(data = resumen_respuestas, aes(x = Codigo, y = Frecuencia, fill = Codigo)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label = Frecuencia), vjust = -0.5) +
+  labs(x = "Código de respuesta", y = "Frecuencia", title = "Distribución de respuestas del servidor")
+```
+
+**Respuesta: Segund Gráfico - Tipo Dona:** 
+
+
+```{r echo=FALSE}
+
+# calcular el porcentaje correspondiente a cada código de respuesta
+resumen_respuestas$Porcentaje <- prop.table(resumen_respuestas$Frecuencia) * 100
+
+# crear el gráfico de dona con etiquetas de porcentaje
+ggplot(data = resumen_respuestas, aes(x = "", y = Frecuencia, fill = Codigo)) +
+  geom_col(width = 1) +
+  coord_polar(theta = "y") +
+  labs(x = NULL, y = NULL, title = "Distribución de respuestas del servidor") +
+  theme_void() +
+  theme(legend.position = "right") +
+  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), position = position_stack(vjust = 0.5))
+```
+
+
+# PREGUNTA 5
+
+Utilizando un algoritmo de aprendizaje no supervisado, realizad un análisis de clústering con k-means para los datos del servidor. 
+
+```{r echo=FALSE}
+
+# Separar el tiempo en días, horas, minutos y segundos
+tiempo_separado <- strsplit(epa_http$Tiempo, ":")
+dias <- sapply(tiempo_separado, "[[", 1)
+horas <- sapply(tiempo_separado, "[[", 2)
+minutos <- sapply(tiempo_separado, "[[", 3)
+segundos <- sapply(tiempo_separado, "[[", 4)
+
+# Calcular la hora a partir de los días, horas y minutos
+hora <-  as.numeric(horas)
+
+# Crear nueva tabla con la hora y la columna Bytes
+Tabla_Hora_Bytes <- data.frame(Hora = hora, Bytes = epa_http$Bytes)
+
+# Reemplazar valores NA por ceros en la columna "Bytes"
+Tabla_Hora_Bytes$Bytes <- ifelse(is.na(Tabla_Hora_Bytes$Bytes), 0, Tabla_Hora_Bytes$Bytes)
+
+Tabla_Hora_Bytes$Caracteres_URL <- nchar(epa_http$URL)
+
+# seleccionar las columnas que se utilizarán para el clustering
+datos_clustering <- Tabla_Hora_Bytes[, c("Caracteres_URL", "Bytes")]
+
+# normalizar los datos
+datos_normalizados <- scale(datos_clustering)
+
+# realizar el clustering con k=3
+set.seed(123) # establecer una semilla para reproducibilidad
+kmeans_model_3 <- kmeans(datos_normalizados, centers = 3)
+
+# realizar el clustering con k=5
+set.seed(123) # establecer una semilla para reproducibilidad
+kmeans_model_5 <- kmeans(datos_normalizados, centers = 5)
+
+```
+
+**Respuesta: Los clúster son:** 
+
+**Para K=3:** 
+
+```{r echo=FALSE}
+
+print(kmeans_model_3)
+```
+
+**Para K=5:** 
+
+```{r echo=FALSE}
+
+print(kmeans_model_5)
+```
+
+# PREGUNTA 6
+
+Representad visualmente en gráficos de tipo scatter plot el resultado de vuestros clústering.  
+
+**Respuesta: Los Gráficos son los siguientes:** 
+
+**Para K=3:** 
+
+```{r echo=FALSE}
+
+# agregar la asignación de cluster como una columna adicional
+datos_clustering$Cluster <- factor(kmeans_model_3$cluster)
+
+# generar el scatter plot
+ggplot(datos_clustering, aes(x = Caracteres_URL, y = Bytes, color = Cluster)) +
+  geom_point() +
+  ggtitle("Clustering con k=3") +
+  labs(x = "Caracteres_URL", y = "Bytes")
+```
+
+**Para K=5:** 
+
+```{r echo=FALSE}
+
+# agregar la asignación de cluster como una columna adicional
+datos_clustering$Cluster <- factor(kmeans_model_5$cluster)
+
+# generar el scatter plot
+ggplot(datos_clustering, aes(x = Caracteres_URL, y = Bytes, color = Cluster)) +
+  geom_point() +
+  ggtitle("Clustering con k=5") +
+  labs(x = "Caracteres_URL", y = "Bytes")
+```
+
