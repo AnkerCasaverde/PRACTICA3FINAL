@@ -85,7 +85,7 @@ Repetir el análisis, esta vez filtrando previamente aquellas peticiones corresp
 tipo_URL <- subset(epa_http, select = c("Tipo", "URL"))
 
 #Filtramos por tipo de imágenes
-tipo_URLimagenes <- subset(tipo_URL, grepl("\\.(png|jpg|gif|ico|JPG|Gif)$", URL))
+tipo_URLimagenes <- subset(tipo_URL, grepl("\\.(png|jpg|gif|ico|JPG|GIF|ICO|PNG)$", URL))
 
 #Hallamos la frecuencia por tipo de Peticiones
 frecuencia_tipo <- table(tipo_URLimagenes$Tipo)
