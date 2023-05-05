@@ -36,7 +36,7 @@ cat("Filas con el valor 'Sin Conexión':", sin_conexion, "\n")
 #3
 
 tipo_URL <- subset(epa_http, select = c("Tipo", "URL"))
-tipo_URLimagenes <- subset(tipo_URL, grepl("\\.(png|jpg|gif|ico|JPG|Gif)$", URL))
+tipo_URLimagenes <- subset(tipo_URL, grepl("\\.(png|jpg|gif|ico|JPG|GIF|ICO|PNG)$", URL))
 
 frecuencia_tipo <- table(tipo_URLimagenes$Tipo)
 
